@@ -38,7 +38,7 @@ ALTER TABLE public.webhook_events ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "staff_view_webhook_events" ON public.webhook_events;
 CREATE POLICY "staff_view_webhook_events" ON public.webhook_events
   FOR SELECT TO authenticated
-  USING (public.is_staff(auth.uid()) OR public.is_admin(auth.uid()));
+  USING (public.is_staff(auth.uid()));
 
 DROP POLICY IF EXISTS "service_insert_webhook_events" ON public.webhook_events;
 CREATE POLICY "service_insert_webhook_events" ON public.webhook_events
@@ -78,12 +78,12 @@ ALTER TABLE public.realtime_alerts ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "staff_view_alerts" ON public.realtime_alerts;
 CREATE POLICY "staff_view_alerts" ON public.realtime_alerts
   FOR SELECT TO authenticated
-  USING (public.is_staff(auth.uid()) OR public.is_admin(auth.uid()));
+  USING (public.is_staff(auth.uid()));
 
 DROP POLICY IF EXISTS "staff_update_alerts" ON public.realtime_alerts;
 CREATE POLICY "staff_update_alerts" ON public.realtime_alerts
   FOR UPDATE TO authenticated
-  USING (public.is_staff(auth.uid()) OR public.is_admin(auth.uid()));
+  USING (public.is_staff(auth.uid()));
 
 DROP POLICY IF EXISTS "service_insert_alerts" ON public.realtime_alerts;
 CREATE POLICY "service_insert_alerts" ON public.realtime_alerts
