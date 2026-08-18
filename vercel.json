@@ -1,0 +1,15 @@
+{
+  "framework": null,
+  "buildCommand": "npm run build",
+  "outputDirectory": ".output",
+  "installCommand": "npm install",
+  "regions": ["bom1"],
+  "functions": {
+    "api/**": {
+      "maxDuration": 30
+    }
+  },
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/" }
+  ]
+}
