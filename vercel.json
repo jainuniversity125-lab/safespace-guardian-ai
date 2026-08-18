@@ -1,15 +1,6 @@
 {
-  "framework": null,
   "buildCommand": "npm run build",
-  "outputDirectory": ".output",
+  "outputDirectory": ".vercel/output",
   "installCommand": "npm install",
-  "regions": ["bom1"],
-  "functions": {
-    "api/**": {
-      "maxDuration": 30
-    }
-  },
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/" }
-  ]
+  "regions": ["bom1"]
 }
