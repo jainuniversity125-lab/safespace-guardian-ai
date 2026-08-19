@@ -96,12 +96,25 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
--- 4. Create a database function that auto-creates a realtime_alert
+-- 4. Database function that auto-creates a realtime_alert
 --    whenever a flagged ingested_post is inserted
+--    FIRED BY TRIGGER ON ingested_posts
 CREATE OR REPLACE FUNCTION public.fn_auto_alert_on_flagged_post()
 RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  expl_array text[];
 BEGIN
   IF NEW.requires_review = true AND NEW.severity IN ('medium','high','critical') THEN
+    BEGIN
+      IF NEW.explanation IS NOT NULL AND jsonb_typeof(NEW.explanation) = 'array' THEN
+        SELECT ARRAY(SELECT jsonb_array_elements_text(NEW.explanation)) INTO expl_array;
+      ELSE
+        expl_array := ARRAY[]::text[];
+      END IF;
+    EXCEPTION WHEN OTHERS THEN
+      expl_array := ARRAY[]::text[];
+    END;
+
     INSERT INTO public.realtime_alerts (
       alert_type, severity, post_id, source_platform,
       author_handle, target_handle, message_preview,
@@ -117,7 +130,7 @@ BEGIN
       COALESCE(NEW.labels, '[]'::jsonb),
       COALESCE(NEW.confidence, 0),
       COALESCE(NEW.final_risk, 0),
-      COALESCE(NEW.explanation::text[], ARRAY[]::text[])
+      expl_array
     );
   END IF;
   RETURN NEW;
