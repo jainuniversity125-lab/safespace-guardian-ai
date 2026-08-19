@@ -87,16 +87,16 @@ async function handleFetch(request: Request): Promise<Response> {
       const { classifyText, sanitizeText } = await import("./lib/analysis.server");
 
       // Log webhook event
-      await supabaseAdmin.from("webhook_events").insert({
+      await Promise.resolve(supabaseAdmin.from("webhook_events").insert({
         source_id: sourceId,
         event_type: "message",
         payload: data,
         status: "processing",
-      }).catch(() => {}); // Non-blocking
+      })).catch(() => {}); // Non-blocking
 
       const { data: source, error: srcErr } = await supabaseAdmin
         .from("ingest_sources")
-        .select("id, name, platform, event_count, active")
+        .select("id, name, platform, event_count, active, created_by")
         .eq("id", sourceId)
         .maybeSingle();
 
@@ -153,7 +153,7 @@ async function handleFetch(request: Request): Promise<Response> {
         .eq("id", source.id);
 
       if (analysis.requires_review && ["medium", "high", "critical"].includes(analysis.severity)) {
-        await supabaseAdmin.from("realtime_alerts").insert({
+        await Promise.resolve(supabaseAdmin.from("realtime_alerts").insert({
           alert_type: analysis.severity === "critical" ? "threat_detected"
             : analysis.severity === "high" ? "harassment_detected"
             : "abuse_detected",
@@ -167,13 +167,14 @@ async function handleFetch(request: Request): Promise<Response> {
           ai_confidence: analysis.confidence,
           final_risk: analysis.final_risk,
           explanation: analysis.explanation,
-        }).catch(() => {});
+        })).catch(() => {});
       }
 
-      if (analysis.requires_review) {
+      if (analysis.requires_review && source.created_by) {
         const { data: contentItem, error: contentErr } = await supabaseAdmin
           .from("content_items")
           .insert({
+            author_id: source.created_by,
             body: `[Ingested from ${source.platform} - Author: @${authorHandle}] ${sanitizeText(body)}`,
             language: analysis.language,
             visibility_status: "hidden",
@@ -184,7 +185,7 @@ async function handleFetch(request: Request): Promise<Response> {
           .single();
         
         if (!contentErr && contentItem) {
-          await supabaseAdmin.from("model_predictions").insert({
+          await Promise.resolve(supabaseAdmin.from("model_predictions").insert({
             content_id: contentItem.id,
             model_version: analysis.model_version,
             labels: analysis.labels,
@@ -196,24 +197,24 @@ async function handleFetch(request: Request): Promise<Response> {
             explanation: analysis.explanation,
             recommended_action: analysis.recommended_action,
             requires_review: true,
-          }).catch(() => {});
+          })).catch(() => {});
 
-          await supabaseAdmin.from("notifications").insert({
+          await Promise.resolve(supabaseAdmin.from("notifications").insert({
             audience: "staff",
             kind: "new_flag",
             severity: analysis.severity as any,
             title: `New flagged ingestion from ${source.name}`,
             object_type: "content",
             object_id: contentItem.id,
-          }).catch(() => {});
+          })).catch(() => {});
         }
       }
 
-      await supabaseAdmin.from("webhook_events")
+      await Promise.resolve(supabaseAdmin.from("webhook_events")
         .update({ status: "processed", processed_at: new Date().toISOString() })
         .eq("source_id", sourceId)
         .eq("status", "processing")
-        .catch(() => {});
+      ).catch(() => {});
 
       return new Response(JSON.stringify({
         ok: true,
@@ -281,4 +282,9 @@ async function handleFetch(request: Request): Promise<Response> {
   }
 }
 
-export default fromWebHandler(handleFetch);
+const defaultExport = {
+  fetch: handleFetch,
+};
+
+export const fetch = handleFetch;
+export default defaultExport;
