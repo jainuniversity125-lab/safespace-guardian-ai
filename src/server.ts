@@ -5,12 +5,8 @@ import { renderErrorPage } from "./lib/error-page";
 
 import { fromWebHandler } from "h3";
 import { createStartHandler, defaultRenderHandler } from "@tanstack/react-start/server";
-import { getRouter } from "./router";
 
-const startHandler = createStartHandler({
-  createRouter: getRouter,
-  render: defaultRenderHandler,
-});
+const startHandler = createStartHandler(defaultRenderHandler);
 
 async function normalizeCatastrophicSsrResponse(response: Response): Promise<Response> {
   if (response.status < 500) return response;
