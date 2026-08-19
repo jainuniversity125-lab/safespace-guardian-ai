@@ -65,8 +65,28 @@ async function handleFetch(request: Request): Promise<Response> {
     });
   }
 
-  // ─── Main Webhook Endpoint (External Platforms) ─────────────
-  if (url.pathname === "/api/webhook") {
+  // ─── Main Webhook Endpoint (External Platforms / X / Twitter) ───
+  if (url.pathname === "/api/webhook" || url.pathname === "/api/webhook/x" || url.pathname === "/api/webhook/twitter") {
+    // 1. Handle GET CRC (Challenge-Response Check) from X / Twitter Developer Portal
+    if (request.method === "GET") {
+      const crcToken = url.searchParams.get("crc_token");
+      if (crcToken) {
+        const consumerSecret = process.env.X_CONSUMER_SECRET || process.env.TWITTER_CONSUMER_SECRET || "safespace_x_consumer_secret";
+        const crypto = await import("node:crypto");
+        const hmac = crypto.createHmac("sha256", consumerSecret).update(crcToken).digest("base64");
+        return new Response(JSON.stringify({
+          response_token: `sha256=${hmac}`
+        }), {
+          status: 200,
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+        });
+      }
+      return new Response(JSON.stringify({ status: "ok", message: "SafeSpace X Webhook Active" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+      });
+    }
+
     if (request.method !== "POST") {
       return new Response(JSON.stringify({ error: "Method not allowed" }), {
         status: 405,
