@@ -2,6 +2,6 @@ import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
   tanstackStart: {
-    spaMode: true,
+    server: { entry: "server" },
   },
 });

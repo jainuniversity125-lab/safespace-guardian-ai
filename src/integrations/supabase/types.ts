@@ -448,6 +448,102 @@ export type Database = {
         }
         Relationships: []
       }
+      realtime_alerts: {
+        Row: {
+          acknowledged: boolean
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          ai_confidence: number
+          ai_labels: Json
+          alert_type: string
+          author_handle: string | null
+          content_id: string | null
+          created_at: string
+          explanation: string[] | null
+          final_risk: number
+          id: string
+          message_preview: string | null
+          post_id: string | null
+          severity: string
+          source_platform: string | null
+          target_handle: string | null
+        }
+        Insert: {
+          acknowledged?: boolean
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          ai_confidence?: number
+          ai_labels?: Json
+          alert_type?: string
+          author_handle?: string | null
+          content_id?: string | null
+          created_at?: string
+          explanation?: string[] | null
+          final_risk?: number
+          id?: string
+          message_preview?: string | null
+          post_id?: string | null
+          severity?: string
+          source_platform?: string | null
+          target_handle?: string | null
+        }
+        Update: {
+          acknowledged?: boolean
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          ai_confidence?: number
+          ai_labels?: Json
+          alert_type?: string
+          author_handle?: string | null
+          content_id?: string | null
+          created_at?: string
+          explanation?: string[] | null
+          final_risk?: number
+          id?: string
+          message_preview?: string | null
+          post_id?: string | null
+          severity?: string
+          source_platform?: string | null
+          target_handle?: string | null
+        }
+        Relationships: []
+      }
+      webhook_events: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          event_type: string
+          id: string
+          payload: Json
+          platform: string
+          processed_at: string | null
+          source_id: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          event_type?: string
+          id?: string
+          payload?: Json
+          platform?: string
+          processed_at?: string | null
+          source_id?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          event_type?: string
+          id?: string
+          payload?: Json
+          platform?: string
+          processed_at?: string | null
+          source_id?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       ingested_posts: {
         Row: {
           author_handle: string
