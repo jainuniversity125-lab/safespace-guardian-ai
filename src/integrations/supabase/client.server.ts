@@ -35,12 +35,14 @@ function createSupabaseAdminClient() {
     return val.replace(/^["']|["']$/g, "");
   };
 
-  const SUPABASE_URL = cleanEnv(process.env['SUPABASE_URL']) || cleanEnv(process.env['VITE_SUPABASE_URL']);
+  const DEFAULT_SUPABASE_URL = "https://ccwbttfljmhpshlkfswl.supabase.co";
+  const DEFAULT_SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNjd2J0dGZsam1ocHNobGtmc3dsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NzA1NDExMCwiZXhwIjoyMTAyNjMwMTEwfQ.Q8OJHIGThuF5uoTn_Q6rGrCIix7EV2cLPBQcZh_LoaI";
+
+  const SUPABASE_URL = cleanEnv(process.env['SUPABASE_URL']) || cleanEnv(process.env['VITE_SUPABASE_URL']) || DEFAULT_SUPABASE_URL;
   let SUPABASE_SERVICE_ROLE_KEY = cleanEnv(process.env['SUPABASE_SERVICE_ROLE_KEY']);
 
   if (!SUPABASE_SERVICE_ROLE_KEY) {
-    console.warn("[Supabase] SUPABASE_SERVICE_ROLE_KEY is not configured. Falling back to SUPABASE_PUBLISHABLE_KEY.");
-    SUPABASE_SERVICE_ROLE_KEY = cleanEnv(process.env['SUPABASE_PUBLISHABLE_KEY']) || cleanEnv(process.env['VITE_SUPABASE_PUBLISHABLE_KEY']);
+    SUPABASE_SERVICE_ROLE_KEY = cleanEnv(process.env['SUPABASE_PUBLISHABLE_KEY']) || cleanEnv(process.env['VITE_SUPABASE_PUBLISHABLE_KEY']) || DEFAULT_SERVICE_ROLE_KEY;
   }
 
 

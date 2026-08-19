@@ -116,10 +116,10 @@ export async function loadFewShotBlock(): Promise<string> {
 
 async function queryGeminiDirect(text: string, systemPrompt: string, apiKey: string): Promise<string> {
   const attempts = [
-    { version: "v1beta", model: "gemini-3.6-flash" },
+    { version: "v1beta", model: "gemini-2.5-flash" },
+    { version: "v1beta", model: "gemini-2.0-flash" },
     { version: "v1", model: "gemini-1.5-flash" },
     { version: "v1beta", model: "gemini-1.5-flash" },
-    { version: "v1beta", model: "gemini-1.5-flash-latest" },
   ];
   let lastError: Error | null = null;
   
