@@ -76,7 +76,7 @@ async function handleFetch(request: Request): Promise<Response> {
           url.searchParams.get("consumer_secret") ||
           process.env.X_CONSUMER_SECRET ||
           process.env.TWITTER_CONSUMER_SECRET ||
-          "safespace_x_consumer_secret";
+          "K3WQ701BUFc03NneScnCpoYPt";
         const crypto = await import("node:crypto");
         const hmac = crypto.createHmac("sha256", consumerSecret).update(crcToken).digest("base64");
         return new Response(JSON.stringify({
