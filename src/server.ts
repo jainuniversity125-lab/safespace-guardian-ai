@@ -3,11 +3,13 @@ import "./lib/error-capture";
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 
-import serverEntry from "@tanstack/react-start/server-entry";
+import { createStartHandler, defaultRenderHandler } from "@tanstack/react-start/server";
+import { getRouter } from "./router";
 
-type ServerEntry = {
-  fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
-};
+const startHandler = createStartHandler({
+  createRouter: getRouter,
+  render: defaultRenderHandler,
+});
 
 // h3 swallows in-handler throws into a normal 500 Response with body
 // {"unhandled":true,"message":"HTTPError"} — try/catch alone never fires for those.
@@ -278,8 +280,7 @@ export default {
     }
 
     try {
-      const handler = (serverEntry as any).default ?? serverEntry;
-      const response = await handler.fetch(request, env, ctx);
+      const response = await startHandler(request);
       return await normalizeCatastrophicSsrResponse(response);
     } catch (error) {
       console.error(error);
