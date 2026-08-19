@@ -3,9 +3,10 @@ import { CATEGORIES, type LabelScore, type Prediction, type Severity } from "./s
 
 export const MODEL_VERSION = "safespace-gemini-3.5-flash-1.0.0";
 
-const SYSTEM_PROMPT = `You are a multilingual cyberbullying detection model used inside a human-in-the-loop
-content-safety platform (English, Hindi, Kannada and code-mixed text included).
-You NEVER make enforcement decisions; you only score content.
+const SYSTEM_PROMPT = `You are a strict, highly sensitive multilingual cyberbullying and safety detection AI used inside a human-in-the-loop content-safety platform.
+You analyze text in ANY language (English, Hindi, Kannada, Tamil, Telugu, Hinglish, Kanglish, Spanish, French, German, and code-mixed text).
+
+Your goal is to detect ALL cyberbullying, harassment, abuse, profanity, threats, doxxing, sexual harassment, and harsh or insulting sentences.
 
 Return STRICT JSON with this shape:
 {
@@ -25,13 +26,13 @@ Return STRICT JSON with this shape:
 }
 
 Allowed category names: ${CATEGORIES.join(", ")}.
-Rules:
-- Multi-label: a message can belong to several categories.
-- Sarcasm, reclaimed slurs, quoting abuse in order to condemn it, and in-group banter are NOT bullying;
-  set quoting_or_condemning true and lower probabilities, but keep confidence honest.
-- If the meaning is genuinely unclear, include "ambiguous_needs_review" with a high probability and
-  keep confidence below 0.6 instead of guessing.
-- Explanations must describe the observed pattern in plain language; never claim certainty.`;
+
+CRITICAL CLASSIFICATION RULES:
+- If text contains ANY targeted insult, abusive word, profanity, or derogatory phrase (e.g., "idiot", "loser", "chutiya", "saala", "bolimaga", "bitch", "shut up", "useless", "mar jaa"), you MUST assign high probability to "harassment" or "insult_humiliation" or "profanity" (>= 0.8), set targeted_harassment_score >= 0.75, toxicity_score >= 0.8, and target_detected = true.
+- If text contains violent threat ("kill", "die", "maar dunga", "saayi"), set threat_score >= 0.9 and label "threat_intimidation".
+- If text contains self-harm encouragement ("kys", "mar jaa", "suicide"), set self_harm_encouragement_score >= 0.95 and label "self_harm_encouragement".
+- Multi-label: a message can belong to multiple categories.
+- Explanations must describe the observed pattern in clear language.`;
 
 type RawAnalysis = {
   language?: string;
@@ -99,16 +100,18 @@ export async function loadFewShotBlock(): Promise<string> {
     const { data } = await supabaseAdmin
       .from("fewshot_examples")
       .select("text, language, script_mix, expected_category, expected_bullying, expected_severity, rationale")
-      .eq("active", true)
-      .order("created_at", { ascending: false })
-      .limit(24);
-    const rows = (data ?? []) as FewShotRow[];
-    if (rows.length === 0) return "";
-    const lines = rows.map(
-      (r) =>
-        `- (${r.language}/${r.script_mix}) "${sanitizeText(r.text).slice(0, 220)}" -> bullying=${r.expected_bullying}, category=${r.expected_category}, severity=${r.expected_severity}${r.rationale ? ` — ${r.rationale}` : ""}`,
-    );
-    return `\n\nHuman-verified regional examples (Indian languages, including code-mixed Kannada/Hindi in Latin script). Follow the reasoning pattern they encode, do not copy their wording:\n${lines.join("\n")}`;
+      .limit(10);
+
+    if (!data?.length) return "";
+    const rows = data as FewShotRow[];
+    const formatted = rows
+      .map(
+        (r) =>
+          `- Input (${r.language}): "${r.text}" -> Category: ${r.expected_category}, Bullying: ${r.expected_bullying}, Severity: ${r.expected_severity}`,
+      )
+      .join("\n");
+
+    return `\n\nApproved classification examples:\n${formatted}\n`;
   } catch {
     return "";
   }
@@ -169,10 +172,16 @@ function runLocalFallback(text: string): string {
   const lower = text.toLowerCase();
   
   let language = "en";
-  if (lower.includes("saala") || lower.includes("chutiya") || lower.includes("kamina")) {
+  if (/chutiya|saala|kamina|madarchod|bhenchod|gandu|harami|bhosdike|bhadwe|mar jaa/.test(lower)) {
     language = "hi";
-  } else if (lower.includes("sule") || lower.includes("boli") || lower.includes("kalla") || lower.includes("kariya")) {
+  } else if (/sule|bolimaga|kariya|bevarsi|saayi|thullu|sooli|magane/.test(lower)) {
     language = "kn";
+  } else if (/pundai|otha|thevidia|loosie|panni/.test(lower)) {
+    language = "ta";
+  } else if (/lanja|kodaka|dengey/.test(lower)) {
+    language = "te";
+  } else if (/puta|mierda|salope|connard|scheisse|arschloch/.test(lower)) {
+    language = "es";
   }
 
   const labels: Array<{ name: string; probability: number }> = [];
@@ -186,52 +195,57 @@ function runLocalFallback(text: string): string {
   const explanation: string[] = [];
   const evidence_spans: string[] = [];
 
-  if (lower.includes("kill") || lower.includes("die") || lower.includes("mardu") || lower.includes("threat") || lower.includes("maar")) {
-    labels.push({ name: "threat_intimidation", probability: 0.92 });
-    threat_score = 0.9;
+  // Violent Threats
+  if (/kill|die|mardu|maar|beat|destroy|threat|hisaab|khoon|savadipen|saayi/.test(lower)) {
+    labels.push({ name: "threat_intimidation", probability: 0.95 });
+    threat_score = 0.95;
+    toxicity_score = 0.9;
+    target_detected = true;
+    explanation.push("Detected violent threat keyword or statement");
+    evidence_spans.push("threat keyword");
+  }
+
+  // Doxxing & Privacy Violation
+  if (/leak|address|dox|phone|number|location|pincode|ip address|personal info/.test(lower)) {
+    labels.push({ name: "doxxing", probability: 0.9 });
+    doxxing_score = 0.9;
+    toxicity_score = 0.8;
+    target_detected = true;
+    explanation.push("Potential private detail leakage or doxxing threat");
+    evidence_spans.push("doxxing keyword");
+  }
+
+  // Sexual Harassment & Abuse
+  if (/sexy|hot|nude|porn|send pic|nudes|bitch|slut|whore|pundai|thevidia|puta|salope/.test(lower)) {
+    labels.push({ name: "sexual_harassment", probability: 0.9 });
+    sexual_exploitation_score = 0.7;
     toxicity_score = 0.85;
     target_detected = true;
-    explanation.push("Detected violent threat keyword ('kill' or 'die')");
-    evidence_spans.push(lower.includes("kill") ? "kill" : lower.includes("die") ? "die" : "threat");
-  }
-
-  if (lower.includes("leak") || lower.includes("address") || lower.includes("dox") || lower.includes("phone") || lower.includes("personal info")) {
-    labels.push({ name: "doxxing", probability: 0.88 });
-    doxxing_score = 0.85;
-    toxicity_score = 0.7;
-    target_detected = true;
-    explanation.push("Potential leakage of private details / doxxing attempt");
-    evidence_spans.push(lower.includes("leak") ? "leak" : "address");
-  }
-
-  if (lower.includes("sexy") || lower.includes("hot") || lower.includes("nude") || lower.includes("porn")) {
-    labels.push({ name: "sexual_harassment", probability: 0.85 });
-    sexual_exploitation_score = 0.4;
-    toxicity_score = 0.75;
-    target_detected = true;
-    explanation.push("Contains sexually explicit content or inappropriate requests");
+    explanation.push("Contains sexually explicit content, inappropriate requests, or sexual slurs");
     evidence_spans.push("sexual reference");
   }
 
+  // Insults, Profanity, Abuse & Harassment in English, Hindi, Kannada, Tamil, Telugu, Spanish
   if (
-    lower.includes("stupid") || lower.includes("idiot") || lower.includes("loser") || lower.includes("ugly") ||
-    lower.includes("chutiya") || lower.includes("saala") || lower.includes("kariya") || lower.includes("bolimaga")
+    /stupid|idiot|loser|ugly|dumb|fool|useless|trash|garbage|hate you|shut up|get lost|bastard|asshole|fuck|shit|crap|chutiya|saala|kariya|bolimaga|madarchod|bhenchod|kamina|gandu|harami|bhosdike|bhadwe|randi|bevarsi|sule|panni|kodaka|lanja|mierda|connard|scheisse|arschloch/.test(lower)
   ) {
-    labels.push({ name: "insult_humiliation", probability: 0.85 });
-    targeted_harassment_score = 0.6;
-    toxicity_score = 0.8;
+    labels.push({ name: "insult_humiliation", probability: 0.9 });
+    labels.push({ name: "harassment", probability: 0.85 });
+    targeted_harassment_score = 0.85;
+    toxicity_score = 0.85;
     target_detected = true;
-    explanation.push("Contains targeted insults or derogatory words");
-    evidence_spans.push("insulting term");
+    explanation.push("Contains targeted insults, abusive words, profanity, or derogatory phrases");
+    evidence_spans.push("insulting/abusive phrase");
   }
 
-  if (lower.includes("suicide") || lower.includes("cut yourself") || lower.includes("kill yourself") || lower.includes("kys")) {
-    labels.push({ name: "self_harm_encouragement", probability: 0.95 });
-    self_harm_encouragement_score = 0.95;
-    toxicity_score = 0.9;
+  // Self Harm Encouragement
+  if (/suicide|cut yourself|kill yourself|kys|mar jaa|die alone|end your life/.test(lower)) {
+    labels.push({ name: "self_harm_encouragement", probability: 0.98 });
+    self_harm_encouragement_score = 0.98;
+    toxicity_score = 0.95;
     target_detected = true;
-    explanation.push("Encouragement of self-harm or suicide");
-    evidence_spans.push("suicide encouragement");
+    explanation.push("Encouragement of self-harm, suicide, or self-destruction");
+    evidence_spans.push("self harm encouragement");
   }
 
   if (labels.length === 0) {
@@ -250,7 +264,7 @@ function runLocalFallback(text: string): string {
     self_harm_encouragement_score,
     targeted_harassment_score,
     toxicity_score,
-    confidence: 0.9,
+    confidence: 0.92,
     explanation,
     evidence_spans
   };
