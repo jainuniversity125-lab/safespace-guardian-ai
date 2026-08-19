@@ -347,13 +347,15 @@ export const simulateIngestedPost = createServerFn({ method: "POST" })
       })
       .eq("id", source.id);
 
-    await client.from("audit_logs").insert({
-      actor_id: userId,
-      event_type: "ingest.post_ingested",
-      object_type: "ingested_post",
-      object_id: post.id,
-      details: { platform: source.platform, severity: analysis.severity },
-    }).catch(() => {});
+    try {
+      await client.from("audit_logs").insert({
+        actor_id: userId,
+        event_type: "ingest.post_ingested",
+        object_type: "ingested_post",
+        object_id: post.id,
+        details: { platform: source.platform, severity: analysis.severity },
+      });
+    } catch {}
 
     if (analysis.requires_review) {
       const { data: contentItem, error: contentErr } = await client
@@ -370,28 +372,32 @@ export const simulateIngestedPost = createServerFn({ method: "POST" })
         .single();
       
       if (!contentErr && contentItem) {
-        await client.from("model_predictions").insert({
-          content_id: contentItem.id,
-          model_version: analysis.model_version,
-          labels: analysis.labels,
-          severity: analysis.severity as any,
-          confidence: analysis.confidence,
-          target_detected: analysis.target_detected,
-          repetition_score: analysis.repetition_score,
-          final_risk: analysis.final_risk,
-          explanation: analysis.explanation,
-          recommended_action: analysis.recommended_action,
-          requires_review: true,
-        }).catch(() => {});
+        try {
+          await client.from("model_predictions").insert({
+            content_id: contentItem.id,
+            model_version: analysis.model_version,
+            labels: analysis.labels,
+            severity: analysis.severity as any,
+            confidence: analysis.confidence,
+            target_detected: analysis.target_detected,
+            repetition_score: analysis.repetition_score,
+            final_risk: analysis.final_risk,
+            explanation: analysis.explanation,
+            recommended_action: analysis.recommended_action,
+            requires_review: true,
+          });
+        } catch {}
 
-        await client.from("notifications").insert({
-          audience: "staff",
-          kind: "new_flag",
-          severity: analysis.severity as any,
-          title: `New flagged ingestion from ${source.name}`,
-          object_type: "content",
-          object_id: contentItem.id,
-        }).catch(() => {});
+        try {
+          await client.from("notifications").insert({
+            audience: "staff",
+            kind: "new_flag",
+            severity: analysis.severity as any,
+            title: `New flagged ingestion from ${source.name}`,
+            object_type: "content",
+            object_id: contentItem.id,
+          });
+        } catch {}
       }
     }
 
